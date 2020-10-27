@@ -1,0 +1,64 @@
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+
+int main() {
+  struct dirent * item;
+  struct stat info;
+  int errno, res = 0;
+
+  int i = 0, a = 0;
+  char newfilename[10];
+
+  DIR * dir = opendir(".");
+  if (dir) {
+    while ((item = readdir(dir)) != 0) {
+      if(stat(item->d_name, &info) != 0) {
+        printf ("Error of stat: %s\n", strerror(errno));
+        res = -1;
+      } else {
+        if ((info.st_mode & S_IFMT) == S_IFREG) {
+          a = atoi (item->d_name);
+          if (a < 0) {
+                printf ("Error of atoi\n");
+                res = 1;
+          } else {
+            if ((a > 0) && (a <= 999)) {
+              a = a + 1000;
+              if (snprintf(newfilename,5,"%d\n",a) < 1) {
+                printf ("Error of snprintf: %s\n",strerror(errno));
+                res = 1;
+              } else {
+                if (rename(item->d_name,newfilename) == 0) {
+                  printf ("The new file name is: %s\n", newfilename);
+                  res = 1;
+                } else {
+                  printf ("Error of rename file: %s\n", strerror(errno));
+                  res = 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    if ((errno != 0) && (item == 0)) {
+      printf ("Error of read dir: %s\n", strerror(errno));
+      res = 1;
+    } else {
+      if (closedir(dir) == -1) {
+        printf ("Error of closing dir: %s\n", strerror(errno));
+        res = 1;
+      }
+    }
+  } else {
+    printf ("Error of open directory: %s\n",strerror(errno));
+    res = 1;
+  }
+  return res;
+}
+                                                                                                                                                                                          64,2        Внизу
