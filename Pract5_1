@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <sys/wait.h>
+
+bool is_dot_or_dotdot(const char* str) {
+ if (str[0] != '.') {
+ return false;
+ }
+
+ const char _Second_char = str[1];
+ if (_Second_char == 0) {
+ return true;
+ }
+
+ if (_Second_char != '.') {
+ return false;
+ }
+
+ return str[2] == 0;
+}
+
+void CheckDir(char *name, int rv) {
+
+ struct dirent * item;
+ struct stat info;
+ int res = 0, res1 =1, a = 0, i = 0;
+ pid_t pid;
+ char * pointer;
+ char newfilename[256] = "", namebuf[256] = "";
+ errno = 0;
+
+ DIR * dir = opendir(name);
+ printf ("opendir: %s\n",name);
+ if (dir) {
+ while((item = readdir(dir)) != 0) {
+ char buffer[256] = "";
+ printf ("Now file is: %s\n", item->d_name);
+ sprintf(buffer, "%s/%s", name, item->d_name);
+ if (stat(buffer, &info) != 0) {
+ printf ("Error of stat: %s", strerror(errno));
+ res = -1;
+ } else {
+ if (((info.st_mode & S_IFMT) == S_IFDIR) && !is_dot_or_dotdot(item->d_name)) {
+ switch(pid = fork()) {
+ case -1:
+ printf ("Error of fork: %s\n", strerror(errno));
+ exit(1);
+ break;
+ case 0:
+ closedir(dir);
+ rv++; //Счетчик дочерних процессов
+ dir = opendir(buffer);
+ sprintf(name, "%s/%s", name, item->d_name);
+ break;
+ }
+ } else {
+ if ((info.st_mode & S_IFMT) == S_IFREG) {
+ res1 = 1;
+ pointer = (&item->d_name[0]);
+ while (*pointer != '\0') {
+ if ((*pointer < '0') || (*pointer > '9')) {
+ res1 = 0;
+ }
+ pointer++;
+ }
+ if (res1 == 1) {
+ a = atoi (item->d_name);
+ if (a < 0) {
+ printf ("Error of atoi\n");
+ res = 1;
+ } else {
+ if ((a > 0) && (a <= 999)) {
+ a = a + 1000;
+ if (snprintf(newfilename,5,"%d\n",a) < 1) {
+ printf ("Error of snprintf: %s\n",strerror(errno));
+ res = 1;
+ } else {
+ char tmpbuf[256] = "";
+ sprintf(namebuf, "%s/%s", name, item->d_name);
+ sprintf(tmpbuf, "%s/%s", name, newfilename);
+ if (rename(namebuf,tmpbuf) == 0) {
+ printf ("The new file name is: %s\n", newfilename);
+ } else {
+ printf ("Error of rename file: %s\n",strerror(errno));
+ res = 1;
+ }
+ }
+ }
+ }
+ }
+ }
+ }
+ }
+ }
+ for (; rv != 0; rv--) {
+ wait(&rv);
+ }
+ if ((errno != 0) && (item == 0)) {
+ printf ("Error of reading directory: %s\n", strerror(errno));
+ res = 1;
+ } else {
+ if (closedir(dir) == -1) {
+ printf ("Error of closing directory: %s\n", strerror(errno));
+ res = 1;
+ }
+ }
+ } else {
+ printf ("Error of open directory: %s\n", strerror(errno));
+ res = 1;
+ }
+}
+
+int main() {
+ int rv;
+ char name[256];
+ getcwd(name, sizeof(name));
+ CheckDir(name);
+}
