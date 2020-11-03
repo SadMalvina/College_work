@@ -35,6 +35,7 @@ void CheckDir(char *name, int rv) {
  char * pointer;
  char newfilename[256] = "", namebuf[256] = "";
  errno = 0;
+ pid_t arr[100];
 
  DIR * dir = opendir(name);
  printf ("opendir: %s\n",name);
@@ -48,17 +49,19 @@ void CheckDir(char *name, int rv) {
  res = -1;
  } else {
  if (((info.st_mode & S_IFMT) == S_IFDIR) && !is_dot_or_dotdot(item->d_name)) {
- switch(pid = fork()) {
- case -1:
+ pid_t pid = fork();
+ if (pid < 0) {
  printf ("Error of fork: %s\n", strerror(errno));
- exit(1);
- break;
- case 0:
+ } else {
+ if (pid == 0) {
+ rv = 0;
  closedir(dir);
- rv++; //Счетчик дочерних процессов
  dir = opendir(buffer);
  sprintf(name, "%s/%s", name, item->d_name);
- break;
+ } else {
+ arr[rv] = pid;
+ rv++;
+ }
  }
  } else {
  if ((info.st_mode & S_IFMT) == S_IFREG) {
@@ -99,8 +102,8 @@ void CheckDir(char *name, int rv) {
  }
  }
  }
- for (; rv != 0; rv--) {
- wait(&rv);
+ for (arr[rv]; rv >= 0; rv--) {
+ waitpid(arr[rv], NULL,0);
  }
  if ((errno != 0) && (item == 0)) {
  printf ("Error of reading directory: %s\n", strerror(errno));
