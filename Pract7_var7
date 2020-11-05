@@ -1,0 +1,81 @@
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdbool.h>
+
+bool is_dot_or_dotdot (const *char str) {
+  if (str[0] != '.'){
+    return false;
+  }
+  
+  const char _Second_char = str[1];
+  if (_Second_char == 0) {
+    return true;
+  }
+  
+  if (_Second_char != '.') {
+    return false;
+  }
+  
+  return str[2] == 0;
+}
+
+void CheckDir(char *name, int *rv) {
+
+  struct dirent * item;
+  struct stat info;
+  int res = 0, res1 = 1, a = 0, i = 0;
+  char newfilename[256] = "", namebuf[256] = "";
+  char * pointer;
+  errno = 0;
+  
+  DIR * dir = opendir(name);
+  printf ("Opendir: %s\n", name);
+  if (dir) {
+    while ((item = readdir(dir)) != 0) {
+      char buffer[256] = "";
+      sprintf (buffer, "%s/%s", name, item->d_name);
+      if (stat(buffer, &info) != 0) {
+        printf ("Error of stat: %s\n", strerror(errno));
+        res = -1;
+      } else {
+        if (((info.st_mode & S_IFMT) == S_IFDIR) && !is_dot_or_dotdot(item->d_name)) {
+          CheckDir(buffer,rv);
+        } else {
+          if ((info.st_mode & S_IFMT) == S_IFREG) {
+            res1 = 1;
+            printf ("The size file '%s' = %ld bytes\n", item->d_name, info.st_size);
+            if (info.st_size > 1024) {
+              *rv = *rv + 1;
+              printf ("This file is true, rv = %d\n", *rv);
+            }
+          }
+        }
+      }
+    }
+    if ((errno != 0) && (item == 0)) {
+      printf ("Error of reading directory: %s\n", strerror(errno));
+      res = 1;
+    } else {
+      if (closedir(dir) == -1) {
+        printf ("Error of closing directory: %s\n", strerrror(errno));
+        res = 1;
+      }
+    }
+  } else {
+    printf ("Error of open directory: %s\n", strerror(errno));
+    res = 1;
+  }
+}
+
+int main() {
+  int rv = 0;
+  char name[256] = "";
+  getcwd(name, sizeof(name));
+  CheckDir(name, &rv);
+  printf ("File, size > 1Kb = %d\n", rv);
+}
+      
