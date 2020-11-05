@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <malloc.h>
 
 bool is_dot_or_dotdot(const char* str) {
  if (str[0] != '.') {
@@ -26,16 +27,22 @@ bool is_dot_or_dotdot(const char* str) {
  return str[2] == 0;
 }
 
-void CheckDir(char *name, int rv) {
+struct Titem {
+int data; //поле структуры
+struct Titem* next; //адрес для следующего элемента структуры
+};
 
+void CheckDir(char *name) {
+
+ struct Titem *first = 0, *m, *g; //структура с указателями на списки и первый элемент
  struct dirent * item;
  struct stat info;
  int res = 0, res1 =1, a = 0, i = 0;
  pid_t pid;
  char * pointer;
+ 
  char newfilename[256] = "", namebuf[256] = "";
  errno = 0;
- pid_t arr[100];
 
  DIR * dir = opendir(name);
  printf ("opendir: %s\n",name);
@@ -54,13 +61,21 @@ void CheckDir(char *name, int rv) {
  printf ("Error of fork: %s\n", strerror(errno));
  } else {
  if (pid == 0) {
- rv = 0;
  closedir(dir);
  dir = opendir(buffer);
  sprintf(name, "%s/%s", name, item->d_name);
+ while (first != NULL) { //пока не достигнут конец списка
+ m = first; //элемент списка fisrst заносится в область памяти
+ first = first->next; //first элемент приравнивается значению следующего элемента списка
+ free(m); //освобождение памяти
+ }
  } else {
- arr[rv] = pid;
- rv++;
+ m = malloc(sizeof(struct Titem)); //создаем область памяти размером с структуру списка
+ if (m) { //занос в список pid-ов процессов
+ m->data = pid;
+ m->next = first;
+ first = m;
+ }
  }
  }
  } else {
@@ -102,8 +117,20 @@ void CheckDir(char *name, int rv) {
  }
  }
  }
- for (arr[rv]; rv >= 0; rv--) {
- waitpid(arr[rv], NULL,0);
+ int status;
+ while(first != NULL) { //перебор элементов списка
+ pid_t result_of_waitpid = waitpid(first->data, &status,0); //получаем статус процесса
+ g = first;
+ first = first->next;
+ free(g);
+ if (!WIFEXITED(status)) { //не равно 0, если дочерний процесс успешно завершился
+ if (result_of_waitpid == -1) {
+ printf ("Child process hasn't finished properly\n");
+ } else {
+ printf ("Child process has returned %d\n", WEXITSTATUS(status));
+ }
+ }
+ }
  }
  if ((errno != 0) && (item == 0)) {
  printf ("Error of reading directory: %s\n", strerror(errno));
@@ -121,7 +148,6 @@ void CheckDir(char *name, int rv) {
 }
 
 int main() {
- int rv;
  char name[256];
  getcwd(name, sizeof(name));
  CheckDir(name);
