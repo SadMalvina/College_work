@@ -1,0 +1,171 @@
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <sys/wait.h>
+#include <malloc.h>
+
+bool is_dot_or_dotdot (const *char str) {
+  if (str[0] != '.'){
+   return false;
+ }
+  
+ const char _Second_char = str[1];
+ if (_Second_char == 0) {
+   return true;
+ }
+  
+ if (_Second_char != '.') {
+   return false;
+ }
+  
+ return str[2] == 0;
+}
+
+struct Titem {
+  int data; //поле структуры
+  struct Titem* next;
+  int pipedf[2];
+}
+
+void CheckDir(char *name, int *rv) {
+
+ struct Titem *first = 0, *m, *g; //структура с указателями на списки и области памяти
+ struct dirent * item;
+ struct stat info;
+ int res = 0, res1 = 1, a = 0, i = 0;
+ 
+ char newfilename[256] = "", namebuf[256] = "";
+ pid_t pid;
+ char * pointer;
+ errno = 0;
+ 
+ DIR * dir = opendir(name);
+ printf ("Opendir: %s\n", name);
+ if (dir) {
+  while ((item = readdir(dir)) != 0) {
+    char buffer[256] = "";
+    sprintf (buffer, "%s/%s", name, item->d_name;
+    if (stat(buffer, &info) != 0) {
+      printf ("Error of stat: %s\n", strerror(errno));
+      res = -1;
+    } else {
+      if (((info.st_mode & S_IFMT) == S_IFDIR) && !is_dot_or_dotdot(item->d_name)) {
+        
+        int pipedf[2], resp = pipe(pipedf);
+        if (resp == -1) printf ("Error of pipe: %s\n", strerror(errno));
+        else {
+        
+          pid_t pid = fork();
+          
+          if (pid < 0) {
+            printf ("Error of fork: %s\n", strerror(errno));
+          } else {
+            if (pid == 0) {
+              closedir(dir);
+              
+              dir = opendir(buffer);
+              sprintf (name, "%s/%s", name, item->d_name);
+              
+              while (first != NULL) {
+                m = first;
+                first = first->next;
+                free(m);
+              }
+            } else {
+              m = malloc(sizeof(struct Titem));
+              if (m) {
+                m->pipedf[0] = pipef[0];
+                m->pipedf[1] = pipef[1];
+                m->data = pid;
+                m->next = first;
+                first = m;
+              }
+            }
+          }
+        }
+      } 
+    } else {
+      if ((info.st_mode & S_IFMT) == S_IFREG) {
+        res1 = 1;
+        printf ("The size file '%s' = %ld bytes\n", item->d_name, info.st_size);
+        if (info.st_size > 1024) {
+          *rv = *rv + 1;
+          printf ("This file is true, rv = %d\n", *rv);
+        }
+      }
+    }
+  }
+}
+
+if (close(pipedf[1] == -1) {
+  printf ("Error of closing pipedf[1]#2: %s\n", strerror(errno));
+}
+
+while (first != NULL) {
+  ssize_t resread = read(pipedf[0], rv, sizeof(*rv));
+  
+  if (resread == -1) {
+    printf ("Error of reading pipe: %s\n", strerror(errno));
+  } else if (resread < sizeof(*rv)) {
+    printf ("Reading less bytes than necessary: %s\n", strerror(errno));
+  } else if (resread == 0) {
+    printf ("Unexpected end of file: %s\n", strerror(errno));
+  } else {
+    printf ("Reading number: %d\n", *rv);
+  }
+}
+
+if (close(pipedf[0]) == -1) {
+  printf ("Error of closing pipedf[0]: %s\n", strerror(errno));
+}
+
+ssize_t reswrite = write(pipedf[1], rv, sizeof(*rv));
+
+if (reswrite != sizeof(*rv)) {
+  printf ("Error writing pipe: %s\n", strerror(errno));
+}
+
+if (close(pipedf[1]) == -1) {
+  printf ("Error of closing pipedf[1]#1: %s\n", strerror(errno));
+}
+ 
+int status;
+while (first != NULL) {
+  pid_t result_of_waitpid = waitpid(first->data, &status, 0);
+  g = first;
+  first = first->next;
+  free(g);
+  if (!WEFEXITED(status)) {
+    if (result_of_waitpid == -1) {
+      printf ("Child process hasn't finished properly\n");
+    } else {
+      printf ("Child process has returned: %d\n", WEXITSTATUS(status));
+    }
+  }
+ }
+ if ((errno != 0) && (item == 0)) {
+      printf ("Error of reading directory: %s\n", strerror(errno));
+      res = 1;
+    } else {
+      if (closedir(dir) == -1) {
+        printf ("Error of closing directory: %s\n", strerrror(errno));
+        res = 1;
+      }
+    }
+  } else {
+    printf ("Error of open directory: %s\n", strerror(errno));
+    res = 1;
+  }
+}
+
+int main() {
+  int rv = 0;
+  char name[256] = "";
+  getcwd(name, sizeof(name));
+  CheckDir(name, &rv);
+  printf ("File, size > 1Kb = %d\n", rv);
+}
