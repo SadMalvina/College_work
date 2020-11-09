@@ -10,7 +10,8 @@
     int k = 1; 
     if ((file = fopen("tekst.txt", "r")) != NULL) {
       while (fscanf (file, "%s\n", filika[i].name) != EOF) {
-        printf("%d: %s\n", k, filika[i].name);
+        if (printf("%d: %s\n", k, filika[i].name) < 0) {
+          printf ("Error of printf: %s\n", strerror(errno));
         i++;
         k++;
       }
